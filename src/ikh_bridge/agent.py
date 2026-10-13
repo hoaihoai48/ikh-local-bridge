@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .local_tools import execute_tool, tool_definitions
 
@@ -28,8 +29,12 @@ def _call_model(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> 
     base_url = os.environ.get("IKH_BRIDGE_MODEL_BASE_URL", DEFAULT_BASE_URL).strip()
     model = os.environ.get("IKH_BRIDGE_MODEL", DEFAULT_MODEL).strip()
     api_key = os.environ.get("IKH_BRIDGE_MODEL_API_KEY", "").strip()
-    if not base_url.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]", "https://")):
-        raise AgentError("Model endpoint must be loopback or an explicitly configured HTTPS endpoint.")
+    parsed = urlparse(base_url)
+    local_hosts = {"127.0.0.1", "localhost", "::1"}
+    if parsed.scheme == "http" and parsed.hostname not in local_hosts:
+        raise AgentError("Plain HTTP model endpoints must use loopback. Use HTTPS for an explicitly configured remote provider.")
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise AgentError("Model endpoint must be a valid local HTTP endpoint or an explicitly configured HTTPS endpoint.")
     payload = json.dumps({
         "model": model,
         "messages": messages,
