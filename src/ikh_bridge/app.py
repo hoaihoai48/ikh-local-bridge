@@ -117,7 +117,7 @@ button{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height
 <script>
 const $=id=>document.getElementById(id);
 async function loadStatus(){const r=await fetch('/api/status');const d=await r.json();$('status').textContent=JSON.stringify(d,null,2);
-if(!d.skill_exists||!d.workspace_exists){$('status').textContent+='\n\nCần cấu hình IKH_BRIDGE_SKILL_FILE và IKH_BRIDGE_WORKSPACE rồi khởi động lại.'}}
+if(!d.skill_exists||!d.workspace_exists){$('status').textContent+='\\n\\nCần cấu hình IKH_BRIDGE_SKILL_FILE và IKH_BRIDGE_WORKSPACE rồi khởi động lại.'}}
 async function loadJobs(){const r=await fetch('/api/jobs');$('jobs').textContent=JSON.stringify((await r.json()).jobs,null,2)}
 $('refresh').addEventListener('click',loadJobs);
 $('run').addEventListener('click',async()=>{const task=$('task').value.trim();if(!task){$('result').textContent='Nhập yêu cầu trước khi chạy.';return}
