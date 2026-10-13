@@ -33,15 +33,15 @@ One Local Bridge instance represents **one selected Skill and its working enviro
 
 ## Implementation gates
 
-- [ ] Single Skill path and workspace configuration.
-- [ ] Load `SKILL.md` as agent instructions.
-- [ ] Local-first OpenAI-compatible model client, no fallback.
-- [ ] Tool-calling loop with bounded iterations and timeouts.
-- [ ] Workspace-confined list/read/write tools.
-- [ ] Explicit local command execution and visible logs.
-- [ ] Task/run history and truthful status.
-- [ ] Tests for traversal protection, tool calls, missing model, iteration cap, and errors.
-- [ ] Local test run on macOS and documented evidence before claiming PASS.
+- [x] Single Skill path and workspace configuration.
+- [x] Load `SKILL.md` as agent instructions.
+- [x] Local-first OpenAI-compatible model client, no fallback.
+- [x] Tool-calling loop with bounded iterations and timeouts.
+- [x] Workspace-confined list/read/write tools.
+- [x] Explicit local command execution and visible logs.
+- [x] Task/run history and truthful status.
+- [x] Initial tests for traversal protection, tool calls, local command execution, and task flow. Missing-model/iteration-cap coverage remains to be expanded.
+- [ ] Real-model smoke test on macOS and end-to-end verification with the intended Skill.
 
 ## Security boundary
 
