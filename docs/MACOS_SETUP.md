@@ -1,102 +1,72 @@
-# Hướng dẫn cài đặt và chạy Local Bridge trên macOS
+# Cài đặt và kiểm thử iKH Local Bridge trên macOS
 
-Tài liệu này hướng dẫn chi tiết cách cài đặt, cấu hình thư viện Skill độc lập và chạy Local Bridge cục bộ trên macOS (Apple Silicon M1/M2/M3/M4 hoặc Intel).
+## 1. Cài đặt
 
----
+Yêu cầu Python 3.11 trở lên.
 
-## 1. Yêu cầu hệ thống
-
-- **Hệ điều hành**: macOS 12 (Monterey) trở lên.
-- **Python**: Phiên bản 3.11 trở lên (khuyến nghị Python 3.11, 3.12, 3.13 hoặc 3.14).
-- **Git** đã được cấu hình.
-
-Kiểm tra phiên bản Python hiện tại trên máy:
 ```bash
 python3 --version
-```
-
----
-
-## 2. Cài đặt môi trường
-
-Từ thư mục gốc của repository `ikh-local-bridge`:
-
-```bash
-# 1. Tạo môi trường ảo riêng biệt
 python3 -m venv .venv
-
-# 2. Kích hoạt môi trường ảo
 source .venv/bin/activate
-
-# 3. Nâng cấp pip và cài đặt dependencies (bao gồm dev tools)
 pip install --upgrade pip
 pip install -e ".[dev]"
 ```
 
+## 2. Tạo Skill Library tối giản
+
+Một Skill chỉ cần `SKILL.md`. Không cần thêm `skill.json` hay script nếu Skill không có công cụ cục bộ cần đăng ký.
+
+```bash
+mkdir -p ~/.ikh-skills/local-bridge-discovery-test
+cat > ~/.ikh-skills/local-bridge-discovery-test/SKILL.md <<'EOF'
+---
+name: local-bridge-discovery-test
+description: Kiểm tra Local Bridge có phát hiện được Skill chỉ gồm SKILL.md hay không.
 ---
 
-## 3. Cách quản lý Thư viện Skill (Độc lập với repo giáo trình)
+# Local Bridge Discovery Test
 
-`ikh-local-bridge` là **runtime dùng chung** cho nhiều Skill. Các Skill không bắt buộc phải nằm cố định trong repo giáo trình hay repo này. Bạn có thể tổ chức Skill theo các cách:
+## Mục tiêu
+Xác nhận Bridge phát hiện và hiển thị Skill chỉ có một file SKILL.md.
 
-### Cách 1: Sử dụng thư mục mặc định người dùng (`~/.ikh-skills`)
-Local Bridge tự động trỏ về `~/.ikh-skills` nếu không tìm thấy thư mục `skills/` cục bộ.
-```bash
-mkdir -p ~/.ikh-skills
-# Sao chép hoặc clone các skill vào đây:
-# ~/.ikh-skills/my-first-skill/
-#   ├── SKILL.md
-#   ├── skill.json
-#   └── scripts/
-```
+## Tiêu chí
+- Skill xuất hiện trong danh sách Skill Library.
+- Tên và mô tả hiển thị đúng.
+- Bridge không yêu cầu tạo skill.json hoặc script chỉ để nhận diện Skill.
 
-### Cách 2: Trỏ tới bất kỳ thư mục Skill nào qua biến môi trường
-Nếu bạn lưu Skill ở thư mục riêng, hoặc trong repo giáo trình, hãy thiết lập:
-```bash
-export IKH_BRIDGE_SKILLS_DIR="/path/to/your/skills-library"
-```
-
-Ví dụ trỏ tới thư mục Skill của repo giáo trình `giao-trinh-ikh`:
-```bash
-export IKH_BRIDGE_SKILLS_DIR="/Users/vu/projects/giao-trinh-ikh/skills"
-```
-
----
-
-## 4. Khởi chạy Local Bridge
-
-Sau khi kích hoạt `.venv`:
-
-```bash
-# Khởi chạy trên cổng mặc định 8765
-ikh-bridge
-
-# Hoặc chỉ định cổng tùy chọn
-ikh-bridge --port 9000
-```
-
-Mở trình duyệt truy cập:
-👉 **http://127.0.0.1:8765**
-
-> **Lưu ý bảo mật**: Local Bridge chỉ bind vào loopback (`127.0.0.1`), không mở ra mạng LAN hay Internet công cộng.
-
----
-
-## 5. Quy trình Kiểm thử (Local Test & Verification)
-
-### 5.1. Chạy Automated Unit & Integration Tests
-```bash
-source .venv/bin/activate
-python -m unittest discover -s tests -v
-```
-
-### 5.2. Chạy Smoke Check thủ công với Skill Template
-```bash
-# 1. Trỏ library về thư mục skill-template mẫu
-export IKH_BRIDGE_SKILLS_DIR="$(pwd)/skill-template/.."
-
-# 2. Khởi chạy bridge
+## Giới hạn
+Đây chỉ là kiểm thử phát hiện Skill, không phải kiểm thử thực thi AI.
+EOF
+export IKH_BRIDGE_SKILLS_DIR="$HOME/.ikh-skills"
 ikh-bridge --port 8765
 ```
 
-Truy cập Web UI, chọn Skill mẫu `Example Local Check`, chọn Tool `check`, nhập một đường dẫn thư mục làm workspace, tích chọn xác nhận đã duyệt mã nguồn và nhấn **Chạy tool**. Kết quả thực thi JSON sẽ trả về ngay trên giao diện và được lưu vào SQLite.
+Mở http://127.0.0.1:8765. Skill `local-bridge-discovery-test` cần xuất hiện với trạng thái chỉ đọc/chưa có tool. Đây là kết quả đúng của phiên bản hiện tại.
+
+## 3. Kiểm tra tự động
+
+Trong terminal khác, tại thư mục repo và sau khi kích hoạt virtualenv:
+
+```bash
+python -m compileall -q src tests
+python -m unittest discover -s tests -v
+```
+
+Chỉ ghi PASS khi các lệnh thực sự chạy và kết quả được quan sát. Các test này kiểm tra Bridge và Python runner hiện tại, không chứng minh AI có thể tự thực thi Skill.
+
+## 4. Skill nào dùng cho kiểm thử end-to-end?
+
+Skill đích là **iKH Curriculum Authoring Skill v1.3**, không phải `Example Local Check` và cũng không phải `local-bridge-discovery-test`.
+
+Kiểm thử end-to-end chỉ được coi là hoàn thành khi Bridge có thể:
+1. Nạp nội dung `SKILL.md` của iKH Curriculum Authoring Skill v1.3.
+2. Gửi nhiệm vụ đến AI runtime/provider mà người dùng chủ động chọn.
+3. Cho AI dùng công cụ local được cho phép để tạo/chỉnh artifact và chạy validator.
+4. Thu thập đầu ra, log và bằng chứng; xử lý lỗi thay vì báo PASS giả.
+5. Trả về artifact và báo cáo kết quả có phân biệt PASS / FAIL / NOT VERIFIED.
+
+**Trạng thái hiện tại: chưa đạt end-to-end.** Phiên bản Bridge trong repo chưa tích hợp AI provider/agent orchestration. Chưa được diễn giải kết quả discovery test hoặc script test thành bằng chứng rằng quy trình AI chạy được.
+
+## 5. Lưu ý an toàn
+
+Bridge mặc định chỉ lắng nghe trên loopback. Python script chạy với quyền của tài khoản máy hiện tại và chưa có OS sandbox. Chỉ chạy script đã xem xét; không dùng workspace chứa dữ liệu quan trọng cho lần thử đầu.
