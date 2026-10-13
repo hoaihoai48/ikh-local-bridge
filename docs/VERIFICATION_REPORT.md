@@ -16,9 +16,13 @@ The previous implementation was a multi-Skill catalogue plus a manifest-driven P
 - Bounded agent/tool loop and tool transcript.
 - Tests rewritten for local tool behavior and single-Skill task flow.
 
-## Not verified in this environment
+## Automated verification
 
-**No local test suite or real Ollama/model run has been executed by this change author.** GitHub source updates are not equivalent to executing the code. Therefore no fresh PASS is claimed.
+GitHub Actions run 38391975720 completed successfully for Python 3.11 and 3.12. Both jobs passed dependency installation, compileall, and the unit/integration test suite. The tested code commit was 99c9484d50a96fa88511f14cb403db1ca1f08557; subsequent changes in this branch were documentation and the one-file smoke-test Skill example.
+
+## Not yet verified
+
+A real Ollama/model tool-calling run has not been executed. Automated tests mock the model response; they prove the local agent/tool loop structure, not compatibility with every installed model or successful end-to-end work with the curriculum Skill.
 
 ## Required gates before acceptance
 
