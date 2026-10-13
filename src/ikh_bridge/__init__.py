@@ -1,3 +1,3 @@
-"""Local-first runtime for reusable Skills."""
+"""Local-first runtime for one Skill and one workspace."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
