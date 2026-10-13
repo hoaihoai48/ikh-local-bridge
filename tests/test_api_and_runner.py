@@ -1,110 +1,154 @@
-"""Integration tests for Local Bridge FastAPI endpoints and tool execution."""
+from __future__ import annotations
+
+import json
 import os
-import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
+from ikh_bridge import agent
 from ikh_bridge.app import app
-from ikh_bridge.jobs import JobStore
+from ikh_bridge.local_tools import execute_tool
 
 
-class BridgeIntegrationTests(unittest.TestCase):
+class LocalToolTests(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp()
-        self.skills_dir = Path(self.temp_dir) / "skills"
-        self.skills_dir.mkdir()
-        self.workspace_dir = Path(self.temp_dir) / "workspace"
-        self.workspace_dir.mkdir()
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+        (self.root / "nested").mkdir()
 
-        # Create a sample skill with valid manifest and check tool
-        self.sample_skill = self.skills_dir / "test-sample-skill"
-        self.sample_skill.mkdir()
-        (self.sample_skill / "SKILL.md").write_text("# Test Skill\nDescription", encoding="utf-8")
-        scripts_dir = self.sample_skill / "scripts"
-        scripts_dir.mkdir()
-        script_file = scripts_dir / "echo_check.py"
-        script_file.write_text(
-            'import os, json\n'
-            'print(json.dumps({"status": "passed", "ws": os.environ.get("IKH_BRIDGE_WORKSPACE")}))\n',
-            encoding="utf-8"
-        )
-        manifest_file = self.sample_skill / "skill.json"
-        manifest_file.write_text(
-            '{\n'
-            '  "schema_version": 1,\n'
-            '  "slug": "test-sample-skill",\n'
-            '  "name": "Test Sample Skill",\n'
-            '  "version": "1.0.0",\n'
-            '  "description": "A test skill for bridge tests",\n'
-            '  "tools": [\n'
-            '    {\n'
-            '      "id": "echo_check",\n'
-            '      "description": "Echo check test",\n'
-            '      "entrypoint": "scripts/echo_check.py",\n'
-            '      "timeout_seconds": 10\n'
-            '    }\n'
-            '  ]\n'
-            '}\n',
-            encoding="utf-8"
-        )
+    def tearDown(self):
+        self.temp.cleanup()
 
-        os.environ["IKH_BRIDGE_SKILLS_DIR"] = str(self.skills_dir)
-        db_path = Path(self.temp_dir) / "test_jobs.sqlite3"
-        os.environ["IKH_BRIDGE_DB"] = str(db_path)
+    def test_write_and_read_workspace_file(self):
+        written = execute_tool("write_file", {"path": "nested/a.txt", "content": "hello"}, self.root)
+        self.assertTrue(written["ok"])
+        read = execute_tool("read_file", {"path": "nested/a.txt"}, self.root)
+        self.assertEqual(read["content"], "hello")
+
+    def test_reject_path_traversal(self):
+        outside = self.root.parent / "outside-bridge-test.txt"
+        try:
+            with self.assertRaises(ValueError):
+                execute_tool("write_file", {"path": "../outside-bridge-test.txt", "content": "bad"}, self.root)
+            self.assertFalse(outside.exists())
+        finally:
+            if outside.exists():
+                outside.unlink()
+
+    def test_run_command_uses_workspace_and_returns_exit_code(self):
+        result = execute_tool("run_command", {
+            "argv": [sys.executable, "-c", "print('ok')"], "timeout_seconds": 10
+        }, self.root)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["exit_code"], 0)
+        self.assertIn("ok", result["stdout"])
+
+    def test_reject_shell_string(self):
+        with self.assertRaises(ValueError):
+            execute_tool("run_command", {"argv": "echo ok"}, self.root)
+
+
+class AgentTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+        self.skill = self.root / "SKILL.md"
+        self.skill.write_text("# Test Skill\nCreate a file when asked.", encoding="utf-8")
+        self.workspace = self.root / "workspace"
+        self.workspace.mkdir()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    @patch("ikh_bridge.agent._call_model")
+    def test_agent_loads_skill_calls_local_tool_then_finishes(self, call_model):
+        call_model.side_effect = [
+            {
+                "content": "",
+                "tool_calls": [{
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {
+                        "name": "write_file",
+                        "arguments": json.dumps({"path": "result.txt", "content": "done"})
+                    }
+                }]
+            },
+            {"content": "Created result.txt and verified the write tool result."}
+        ]
+        result = agent.run_agent(self.skill, self.workspace, "Create result.txt")
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual((self.workspace / "result.txt").read_text(encoding="utf-8"), "done")
+        self.assertEqual(result["rounds"], 2)
+        self.assertEqual(call_model.call_count, 2)
+        first_messages = call_model.call_args_list[0].args[0]
+        self.assertIn("# Test Skill", first_messages[0]["content"])
+
+    def test_agent_requires_real_skill_file(self):
+        with self.assertRaises(agent.AgentError):
+            agent.run_agent(self.root / "missing.md", self.workspace, "Do work")
+
+
+class AppTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+        self.skill = self.root / "SKILL.md"
+        self.skill.write_text("# Single Skill", encoding="utf-8")
+        self.workspace = self.root / "workspace"
+        self.workspace.mkdir()
+        os.environ["IKH_BRIDGE_SKILL_FILE"] = str(self.skill)
+        os.environ["IKH_BRIDGE_WORKSPACE"] = str(self.workspace)
+        os.environ["IKH_BRIDGE_DB"] = str(self.root / "jobs.sqlite3")
         self.client = TestClient(app)
 
     def tearDown(self):
-        os.environ.pop("IKH_BRIDGE_SKILLS_DIR", None)
-        os.environ.pop("IKH_BRIDGE_DB", None)
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        for key in ("IKH_BRIDGE_SKILL_FILE", "IKH_BRIDGE_WORKSPACE", "IKH_BRIDGE_DB"):
+            os.environ.pop(key, None)
+        self.temp.cleanup()
 
-    def test_health_endpoint(self):
-        res = self.client.get("/health")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertEqual(data["status"], "ok")
-        self.assertEqual(data["app"], "ikh-local-bridge")
+    def test_status_is_one_skill_not_a_catalog(self):
+        response = self.client.get("/api/status")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["execution_mode"], "single_skill_local_agent")
+        self.assertTrue(data["skill_exists"])
+        self.assertTrue(data["workspace_exists"])
+        self.assertNotIn("skills", data)
 
-    def test_skills_discovery_api(self):
-        res = self.client.get("/api/skills")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertEqual(len(data["skills"]), 1)
-        skill = data["skills"][0]
-        self.assertEqual(skill["slug"], "test-sample-skill")
-        self.assertTrue(skill["runnable"])
-        self.assertEqual(len(skill["tools"]), 1)
-        self.assertEqual(skill["tools"][0]["id"], "echo_check")
+    @patch("ikh_bridge.app.run_agent")
+    def test_task_uses_configured_skill_and_workspace(self, run_agent):
+        run_agent.return_value = {
+            "status": "COMPLETED", "answer": "done", "rounds": 1, "transcript": [],
+            "model": "test-model", "endpoint": "http://127.0.0.1:11434/v1",
+            "workspace": str(self.workspace),
+        }
+        response = self.client.post("/api/task", json={"task": "Create a file"})
+        self.assertEqual(response.status_code, 200)
+        run_agent.assert_called_once_with(self.skill.resolve(), self.workspace.resolve(), "Create a file")
 
-    def test_run_tool_unreviewed_rejected(self):
-        res = self.client.post("/api/run", json={
-            "skill_slug": "test-sample-skill",
-            "tool_id": "echo_check",
-            "workspace": str(self.workspace_dir),
-            "reviewed": False,
-        })
-        self.assertEqual(res.status_code, 400)
-        self.assertIn("Review the Skill script", res.json()["detail"])
+    def test_home_uses_skill_specific_ui_when_present(self):
+        custom_ui = self.root / "bridge-ui.html"
+        custom_ui.write_text("<html><body>Dedicated Curriculum UI</body></html>", encoding="utf-8")
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Dedicated Curriculum UI", response.text)
 
-    def test_run_tool_success(self):
-        res = self.client.post("/api/run", json={
-            "skill_slug": "test-sample-skill",
-            "tool_id": "echo_check",
-            "workspace": str(self.workspace_dir),
-            "reviewed": True,
-        })
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertEqual(data["status"], "COMPLETED")
-        self.assertEqual(data["exit_code"], 0)
-        self.assertIn('"status": "passed"', data["stdout"])
+    def test_home_has_built_in_workbench_without_custom_ui(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Skill workbench", response.text)
+        self.assertIn("Chạy Skill", response.text)
 
-        # Check job history
-        res_jobs = self.client.get("/api/jobs")
-        self.assertEqual(res_jobs.status_code, 200)
-        jobs = res_jobs.json()["jobs"]
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(jobs[0]["status"], "COMPLETED")
-        self.assertEqual(jobs[0]["skill_slug"], "test-sample-skill")
+    def test_empty_task_rejected(self):
+        response = self.client.post("/api/task", json={"task": ""})
+        self.assertEqual(response.status_code, 422)
+
+
+if __name__ == "__main__":
+    unittest.main()

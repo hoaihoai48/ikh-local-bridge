@@ -1,102 +1,76 @@
-# Hướng dẫn cài đặt và chạy Local Bridge trên macOS
+# Cài đặt và kiểm thử iKH Local Bridge trên macOS
 
-Tài liệu này hướng dẫn chi tiết cách cài đặt, cấu hình thư viện Skill độc lập và chạy Local Bridge cục bộ trên macOS (Apple Silicon M1/M2/M3/M4 hoặc Intel).
+## Mục tiêu
 
----
+Một tiến trình Local Bridge chạy cho **một Skill cụ thể** và một thư mục làm việc. Bridge đọc SKILL.md, gửi nhiệm vụ đến model đã cấu hình, sau đó thực thi các thao tác file/lệnh tại máy local thông qua tool loop.
 
-## 1. Yêu cầu hệ thống
+## 1. Cài đặt Bridge
 
-- **Hệ điều hành**: macOS 12 (Monterey) trở lên.
-- **Python**: Phiên bản 3.11 trở lên (khuyến nghị Python 3.11, 3.12, 3.13 hoặc 3.14).
-- **Git** đã được cấu hình.
+Yêu cầu Python 3.11 trở lên.
 
-Kiểm tra phiên bản Python hiện tại trên máy:
-```bash
-python3 --version
-```
+    git clone https://github.com/hoaihoai48/ikh-local-bridge.git
+    cd ikh-local-bridge
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install --upgrade pip
+    pip install -e ".[dev]"
 
----
+## 2. Chuẩn bị model local mặc định
 
-## 2. Cài đặt môi trường
+Cài Ollama từ https://ollama.com/, sau đó chạy:
 
-Từ thư mục gốc của repository `ikh-local-bridge`:
+    ollama pull qwen2.5-coder:7b
+    ollama serve
 
-```bash
-# 1. Tạo môi trường ảo riêng biệt
-python3 -m venv .venv
+Model phải hỗ trợ OpenAI-compatible chat completions và tool calling. Nếu chọn model khác, thay IKH_BRIDGE_MODEL bằng tên model đó.
 
-# 2. Kích hoạt môi trường ảo
-source .venv/bin/activate
+## 3. Chọn đúng một Skill và workspace
 
-# 3. Nâng cấp pip và cài đặt dependencies (bao gồm dev tools)
-pip install --upgrade pip
-pip install -e ".[dev]"
-```
+Thay đường dẫn mẫu bằng đường dẫn thực tế:
 
----
+    export IKH_BRIDGE_SKILL_FILE="/absolute/path/to/your-skill/SKILL.md"
+    export IKH_BRIDGE_WORKSPACE="/absolute/path/to/working-directory"
+    export IKH_BRIDGE_MODEL="qwen2.5-coder:7b"
+    export IKH_BRIDGE_MODEL_BASE_URL="http://127.0.0.1:11434/v1"
+    ikh-bridge --port 8765
 
-## 3. Cách quản lý Thư viện Skill (Độc lập với repo giáo trình)
+Giữ nguyên các biến môi trường đó trong terminal chạy Bridge. Mở http://127.0.0.1:8765. Trang phải hiển thị đúng một đường dẫn Skill, một workspace, model và endpoint.
 
-`ikh-local-bridge` là **runtime dùng chung** cho nhiều Skill. Các Skill không bắt buộc phải nằm cố định trong repo giáo trình hay repo này. Bạn có thể tổ chức Skill theo các cách:
+## 4. Chạy thử thực tế
 
-### Cách 1: Sử dụng thư mục mặc định người dùng (`~/.ikh-skills`)
-Local Bridge tự động trỏ về `~/.ikh-skills` nếu không tìm thấy thư mục `skills/` cục bộ.
-```bash
-mkdir -p ~/.ikh-skills
-# Sao chép hoặc clone các skill vào đây:
-# ~/.ikh-skills/my-first-skill/
-#   ├── SKILL.md
-#   ├── skill.json
-#   └── scripts/
-```
+Trước khi thử Skill chính, hãy dùng Skill một-file có sẵn tại examples/local-bridge-smoke-test/SKILL.md và một workspace tạm thời. Cấu hình IKH_BRIDGE_SKILL_FILE trỏ chính xác tới file này. Giao nhiệm vụ: Run the smoke test exactly as described in SKILL.md. Kết quả đạt yêu cầu là file hello.txt trong workspace có nội dung chính xác LOCAL_BRIDGE_SMOKE_TEST=PASS và agent đọc lại được nội dung đó.
 
-### Cách 2: Trỏ tới bất kỳ thư mục Skill nào qua biến môi trường
-Nếu bạn lưu Skill ở thư mục riêng, hoặc trong repo giáo trình, hãy thiết lập:
-```bash
-export IKH_BRIDGE_SKILLS_DIR="/path/to/your/skills-library"
-```
+Kiểm tra:
+1. Bridge hiển thị đúng Skill và workspace đã cấu hình.
+2. Model phản hồi được; không có fallback sang cloud nếu endpoint local tắt.
+3. Agent gọi tool write_file để tạo file.
+4. Agent gọi read_file hoặc run_command để kiểm tra kết quả.
+5. Transcript có kết quả tool thật; file tồn tại trong workspace.
+6. Nếu model endpoint không chạy, Bridge trả lỗi rõ ràng chứ không giả vờ đã hoàn tất.
 
-Ví dụ trỏ tới thư mục Skill của repo giáo trình `giao-trinh-ikh`:
-```bash
-export IKH_BRIDGE_SKILLS_DIR="/Users/vu/projects/giao-trinh-ikh/skills"
-```
+Sau khi smoke test thành công, mới cấu hình IKH_BRIDGE_SKILL_FILE trỏ tới Skill thực tế, ví dụ iKH Curriculum Authoring Skill v1.3, và chạy một nhiệm vụ nhỏ có tiêu chí đầu ra rõ ràng. Smoke test không chứng minh mọi chức năng của Skill giáo trình đã hoạt động.
 
----
+## 5. Kiểm thử tự động
 
-## 4. Khởi chạy Local Bridge
+Trong virtualenv tại thư mục repo:
 
-Sau khi kích hoạt `.venv`:
+    python -m compileall -q src tests
+    python -m unittest discover -s tests -v
 
-```bash
-# Khởi chạy trên cổng mặc định 8765
-ikh-bridge
+Các test unit/integration không thay thế lần chạy thực tế với model local. Chỉ ghi PASS khi đã chạy lệnh và xem kết quả.
 
-# Hoặc chỉ định cổng tùy chọn
-ikh-bridge --port 9000
-```
+## 6. Dùng provider từ xa (chỉ khi chủ động chọn)
 
-Mở trình duyệt truy cập:
-👉 **http://127.0.0.1:8765**
+Chỉ khi chấp nhận gửi nội dung Skill, yêu cầu và kết quả tool ra ngoài, mới cấu hình endpoint HTTPS và API key phù hợp:
 
-> **Lưu ý bảo mật**: Local Bridge chỉ bind vào loopback (`127.0.0.1`), không mở ra mạng LAN hay Internet công cộng.
+    export IKH_BRIDGE_MODEL_BASE_URL="https://provider.example/v1"
+    export IKH_BRIDGE_MODEL="provider-model-name"
+    export IKH_BRIDGE_MODEL_API_KEY="your-key"
 
----
+Không commit API key vào repo. Bridge không tự chuyển sang provider từ xa khi model local lỗi.
 
-## 5. Quy trình Kiểm thử (Local Test & Verification)
+## Giới hạn hiện tại
 
-### 5.1. Chạy Automated Unit & Integration Tests
-```bash
-source .venv/bin/activate
-python -m unittest discover -s tests -v
-```
-
-### 5.2. Chạy Smoke Check thủ công với Skill Template
-```bash
-# 1. Trỏ library về thư mục skill-template mẫu
-export IKH_BRIDGE_SKILLS_DIR="$(pwd)/skill-template/.."
-
-# 2. Khởi chạy bridge
-ikh-bridge --port 8765
-```
-
-Truy cập Web UI, chọn Skill mẫu `Example Local Check`, chọn Tool `check`, nhập một đường dẫn thư mục làm workspace, tích chọn xác nhận đã duyệt mã nguồn và nhấn **Chạy tool**. Kết quả thực thi JSON sẽ trả về ngay trên giao diện và được lưu vào SQLite.
+- Tool file bị giới hạn trong workspace, nhưng lệnh hệ điều hành chạy với quyền tài khoản hiện tại và chưa có OS sandbox.
+- Model coding/text không tự sinh ảnh. Cần adapter/model tạo ảnh local thực sự nếu Skill yêu cầu.
+- Chưa được coi là production-ready cho dữ liệu quan trọng; thử nghiệm trước trong workspace dùng một lần.

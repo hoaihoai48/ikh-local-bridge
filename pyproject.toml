@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ikh-local-bridge"
-version = "0.1.0"
-description = "Local-first runtime for reusable, provider-independent Skills"
+version = "0.2.0"
+description = "Local-first agent runtime for one Skill and one workspace"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
