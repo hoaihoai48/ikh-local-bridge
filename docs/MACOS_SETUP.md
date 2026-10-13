@@ -38,7 +38,7 @@ Giữ nguyên các biến môi trường đó trong terminal chạy Bridge. Mở
 
 ## 4. Chạy thử thực tế
 
-Trước khi thử Skill chính, hãy dùng một workspace tạm thời và một Skill có hướng dẫn ngắn, ví dụ yêu cầu tạo file hello.txt rồi đọc lại file đó.
+Trước khi thử Skill chính, hãy dùng Skill một-file có sẵn tại examples/local-bridge-smoke-test/SKILL.md và một workspace tạm thời. Cấu hình IKH_BRIDGE_SKILL_FILE trỏ chính xác tới file này. Giao nhiệm vụ: Run the smoke test exactly as described in SKILL.md. Kết quả đạt yêu cầu là file hello.txt trong workspace có nội dung chính xác LOCAL_BRIDGE_SMOKE_TEST=PASS và agent đọc lại được nội dung đó.
 
 Kiểm tra:
 1. Bridge hiển thị đúng Skill và workspace đã cấu hình.
@@ -47,6 +47,8 @@ Kiểm tra:
 4. Agent gọi read_file hoặc run_command để kiểm tra kết quả.
 5. Transcript có kết quả tool thật; file tồn tại trong workspace.
 6. Nếu model endpoint không chạy, Bridge trả lỗi rõ ràng chứ không giả vờ đã hoàn tất.
+
+Sau khi smoke test thành công, mới cấu hình IKH_BRIDGE_SKILL_FILE trỏ tới Skill thực tế, ví dụ iKH Curriculum Authoring Skill v1.3, và chạy một nhiệm vụ nhỏ có tiêu chí đầu ra rõ ràng. Smoke test không chứng minh mọi chức năng của Skill giáo trình đã hoạt động.
 
 ## 5. Kiểm thử tự động
 
