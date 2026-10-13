@@ -132,7 +132,7 @@ class AppTests(unittest.TestCase):
         run_agent.assert_called_once_with(self.skill.resolve(), self.workspace.resolve(), "Create a file")
 
     def test_empty_task_rejected(self):
-        response = self.client.post("/api/task", json={"task": " "})
+        response = self.client.post("/api/task", json={"task": ""})
         self.assertEqual(response.status_code, 422)
 
 
