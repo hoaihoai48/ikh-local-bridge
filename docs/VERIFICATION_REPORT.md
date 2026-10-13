@@ -1,43 +1,39 @@
-# Báo cáo Kiểm chứng & Đánh giá Trạng thái Local Bridge (Verification Report)
+# Local Bridge Verification Status
 
-**Thời điểm thực hiện**: 2026-10-13  
-**Môi trường thử nghiệm**: macOS (Darwin arm64 / Apple Silicon), Python 3.14.7  
-**Repository**: `hoaihoai48/ikh-local-bridge` (Private)
+## Architecture reset
 
----
+The previous implementation was a multi-Skill catalogue plus a manifest-driven Python script runner. That did not meet the product requirement. The rebuild branch changes the intended runtime to one configured Skill, one workspace, and a local-first AI agent loop.
 
-## 1. Tóm tắt kết quả kiểm chứng (Test Matrix)
+## Implemented in this branch
 
-| Hạng mục kiểm tra | Phạm vi / Kịch bản | Trạng thái | Ghi chú & Bằng chứng |
-| :--- | :--- | :---: | :--- |
-| **Manifest Parsing** | Đọc `skill.json`, kiểm tra schema version 1, slug match | ✅ **PASS** | `test_manifest.py`: Nhận diện đúng metadata, tên, phiên bản. |
-| **Path Traversal Protection** | Chặn entrypoint `../../evil.py` hoặc đường dẫn tuyệt đối | ✅ **PASS** | `test_reject_path_traversal`: Ngăn chặn thành công escape ra ngoài thư mục Skill. |
-| **Unmanaged Skills Discovery** | Thư mục chỉ có `SKILL.md` (chưa có `skill.json`) | ✅ **PASS** | Phát hiện nhưng đánh dấu `runnable: false`, không cho phép execute script tự do. |
-| **Local Bridge Service Health** | Endpoint `GET /health` | ✅ **PASS** | Trả về `{"status": "ok", "app": "ikh-local-bridge", "version": "0.1.0"}` |
-| **Skills Discovery API** | Endpoint `GET /api/skills` | ✅ **PASS** | Trả về danh sách skills, tools, trạng thái runnable và library path. |
-| **Tool Execution Safety Gate** | Endpoint `POST /api/run` với `reviewed=False` | ✅ **PASS** | Trả về lỗi 400 Bad Request, bắt buộc cờ xác nhận `reviewed=True`. |
-| **Tool Execution (Runner)** | Endpoint `POST /api/run` với `reviewed=True` | ✅ **PASS** | Thực thi subprocess với `sys.executable`, `shell=False`, truyền env `IKH_BRIDGE_WORKSPACE`. |
-| **SQLite Job Store** | Ghi nhận job ID, status `COMPLETED`, exit code 0, log | ✅ **PASS** | `GET /api/jobs` phản hồi chính xác lịch sử thực thi vừa chạy. |
-| **Loopback Binding Check** | CLI flag `--host` chỉ chấp nhận loopback | ✅ **PASS** | Từ chối các host không thuộc loopback (`0.0.0.0` hoặc IP mạng ngoài). |
+- One Skill file configured through IKH_BRIDGE_SKILL_FILE.
+- One workspace configured through IKH_BRIDGE_WORKSPACE.
+- SKILL.md is loaded into the agent's system instructions; no per-Skill manifest is needed.
+- OpenAI-compatible chat completions with tool calling.
+- Local endpoint defaulting to Ollama loopback; no automatic cloud fallback.
+- Local tools for listing, reading, and writing workspace files and executing argv commands.
+- Workspace path checks for file tools.
+- Bounded agent/tool loop and tool transcript.
+- Tests rewritten for local tool behavior and single-Skill task flow.
 
----
+## Not verified in this environment
 
-## 2. Các phần ĐÃ KIỂM CHỨNG (Verified)
+**No local test suite or real Ollama/model run has been executed by this change author.** GitHub source updates are not equivalent to executing the code. Therefore no fresh PASS is claimed.
 
-1. **Khả năng chạy độc lập ngoài repo giáo trình**:
-   - `default_library()` đã được nâng cấp để fallback tự động (`IKH_BRIDGE_SKILLS_DIR` -> `./skills` -> `~/.ikh-skills`), không còn phụ thuộc cứng vào cấu trúc monorepo `parents[3]`.
-2. **Khởi tạo và cài đặt venv trên macOS**:
-   - Đã cài đặt thành công bản editable `pip install -e ".[dev]"` trên Python 3.14 macOS arm64.
-3. **Bộ unit test và integration test hoàn chỉnh**:
-   - 7/7 test passed tự động (`tests/test_manifest.py`, `tests/test_api_and_runner.py`).
+## Required gates before acceptance
 
----
+1. Run python -m compileall -q src tests.
+2. Run python -m unittest discover -s tests -v.
+3. Start Ollama and pull a model that supports tool calling.
+4. Configure a disposable Skill and workspace.
+5. Run a task that writes and rereads a file; inspect both the artifact and tool transcript.
+6. Stop Ollama and verify that the Bridge reports connection failure without cloud fallback.
+7. Confirm traversal attempts are rejected.
+8. Review subprocess security before using important files.
 
-## 3. Các phần CHƯA KIỂM CHỨNG & Giới hạn hiện tại (Known Limitations / Not Verified)
+## Remaining limitations
 
-| Giới hạn | Chi tiết | Hướng xử lý tương lai |
-| :--- | :--- | :--- |
-| **OS Sandbox / Resource Isolation** | Quá trình chạy tool sử dụng quyền của user hiện tại, chưa có `sandbox-exec` (macOS Seatbelt) hay container cô lập filesystem. | Cần cẩn trọng khi duyệt mã script trước khi chạy. |
-| **Process Cancellation / Streaming logs** | Quá trình chạy script hiện là synchronous blocking (`subprocess.run`). Chưa hỗ trợ hủy giữa chừng hoặc stream log trực tiếp qua WebSocket/SSE. | Bổ sung background worker / async process manager. |
-| **Input Arguments Schema** | Chưa hỗ trợ truyền tham số động (parameter schema) từ UI vào tool; tool hiện chỉ nhận thư mục workspace. | Bổ sung khai báo params trong `skill.json` ở phiên bản v2. |
-| **Tích hợp AI Provider** | Chưa có adapter tự động kết nối API LLM (OpenAI, Gemini, Claude, local Ollama). | Dự kiến bổ sung tầng Provider Adapter độc lập. |
+- No full OS sandbox: command execution uses current-user permissions.
+- Local image generation is not implemented by the text/coding model adapter.
+- Long tasks are synchronous and have no cancel/streaming controls yet.
+- The model can still make reasoning errors; verify important outputs independently.
