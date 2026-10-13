@@ -49,6 +49,10 @@ A Skill may include:
 
 See `skill-template/` for the portable Skill contract. Keep each Skill's own requirements and assets within its folder where practical.
 
+## Quality workflow
+
+The Skill template adopts selected ECC ideas without installing the ECC runtime: plan first, prefer test-first changes, inspect executable code and dependencies, and report exact verification evidence. See [ECC integration review](docs/ECC_INTEGRATION_REVIEW.md) for the selection rationale.
+
 ## Safety model (MVP)
 
 - The server defaults to `127.0.0.1`; do not expose it to a LAN or public internet.
@@ -58,7 +62,7 @@ See `skill-template/` for the portable Skill contract. Keep each Skill's own req
 - Do not place API keys or credentials in Skills, manifests, logs, or the repository.
 - This MVP does not call any AI provider automatically and has no implicit cloud fallback.
 - No generic file-edit, Git-push, delete, or network tool is provided. However, a declared Python script runs with the current OS user's permissions and could still modify files or use the network. Review code first and use a disposable workspace for initial tests.
-- Treat this as a development MVP; perform local tests and security review before using it on important files.
+- This is a development MVP; perform local tests and security review before using it on important files.
 
 ## Current limitations
 
@@ -71,7 +75,11 @@ See `skill-template/` for the portable Skill contract. Keep each Skill's own req
 
 ## Development checks
 
+Run these locally from the repository root:
+
 ```bash
-python -m compileall src
+python -m compileall -q src tests
 python -m unittest discover -s tests -v
 ```
+
+Report the actual output. Do not mark a check as passed unless it was executed and its result observed.
