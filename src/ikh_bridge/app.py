@@ -12,7 +12,9 @@ from .agent import AgentError, run_agent
 from .jobs import JobStore
 
 app = FastAPI(title="iKH Local Bridge", version="0.2.0")
-store = JobStore()
+def get_store() -> JobStore:
+    # Resolve environment overrides at request time, which also keeps tests isolated.
+    return JobStore()
 
 
 def configured_skill_file() -> Path:
@@ -52,7 +54,7 @@ def status() -> dict:
 
 @app.get("/api/jobs")
 def jobs() -> dict:
-    return {"jobs": store.list()}
+    return {"jobs": get_store().list()}
 
 
 @app.post("/api/task")
@@ -69,6 +71,7 @@ def run_task(request: TaskRequest) -> dict:
             status_code=400,
             detail="Set IKH_BRIDGE_WORKSPACE to an existing local working directory.",
         )
+    store = get_store()
     job_id = store.create(skill_file.parent.name, "agent_task", str(workspace))
     try:
         result = run_agent(skill_file, workspace, request.task.strip())
