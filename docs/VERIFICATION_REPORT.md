@@ -2,7 +2,7 @@
 
 **Thời điểm thực hiện**: 2026-10-13  
 **Môi trường thử nghiệm**: macOS (Darwin arm64 / Apple Silicon), Python 3.14.7  
-**Repository**: `hoaihoai48/ikh-local-bridge` (Private)
+**Repository**: `hoaihoai48/ikh-local-bridge` (Public)
 
 ---
 
