@@ -1,24 +1,28 @@
-# Local Bridge MVP
+# iKH Local Bridge
 
-Local Bridge is a local-first host for reusable Skills created by the user with ChatGPT or another AI. It is **not** a separate bridge per Skill.
+Local Bridge is a **single local runtime shared by many Skills**. A Skill is primarily a folder containing one required file, `SKILL.md`. The Bridge may optionally expose deterministic local tools, but those tools are not required for a Skill to be a valid Skill.
 
-## MVP goals
+## What this version does
 
-- Discover Skill folders from a local Skill library.
-- Read a small, provider-independent `skill.json` manifest.
-- Expose a local UI and API for inspecting Skills and registered tools.
-- Execute only explicitly registered Python entrypoints, without a shell.
-- Persist job records in SQLite and record logs/results.
-- Bind the server to loopback by default.
+- Discovers local Skill folders containing `SKILL.md`.
+- Reads optional `skill.json` manifests when a Skill declares deterministic Python tools.
+- Shows Skill metadata and registered tools in a local web UI.
+- Runs only explicitly declared Python entrypoints, without `shell=True`.
+- Stores tool-job history in SQLite.
+- Binds to loopback by default.
 
-## Status
+## Important: what it does not do yet
 
-This is the first scaffold, not a security-certified or production-ready runtime. Existing Skills that do not yet have `skill.json` can be discovered by their `SKILL.md`, but cannot be executed until their tools are explicitly declared and reviewed.
+**This version does not execute an AI agent or call an AI provider.** It cannot take an arbitrary task, make an AI follow `SKILL.md`, use tools iteratively, build multi-file deliverables, run validators, fix failures, and return a verified final package as one end-to-end workflow.
 
-## Requirements
+A Skill containing only `SKILL.md` is valid and discoverable, but this version can only display/discover it. The optional manifest is a Local Bridge tool-registration mechanism, **not a universal requirement for Skills**.
+
+Do not treat the deterministic Python example as the intended end-to-end test. The real acceptance test must use `iKH Curriculum Authoring Skill v1.3` with an explicitly selected AI runtime/provider and local validators. That acceptance test is blocked until AI-agent orchestration is implemented.
+
+## Requirements and setup
 
 - Python 3.11+
-- Install dependencies in an isolated virtual environment.
+- An isolated virtual environment
 
 From the repository root:
 
@@ -31,47 +35,43 @@ ikh-bridge
 
 Open http://127.0.0.1:8765.
 
-Chi tiết cài đặt và cấu hình riêng cho macOS: xem [Hướng dẫn cài đặt macOS](docs/MACOS_SETUP.md) và [Báo cáo kiểm chứng](docs/VERIFICATION_REPORT.md).
+See [macOS setup and test guide](docs/MACOS_SETUP.md), [Skill contract](docs/SKILL_CONTRACT.md), and [verification status](docs/VERIFICATION_REPORT.md).
 
 ## Skill library
 
-Mặc định, Local Bridge sẽ tìm Skill theo thứ tự ưu tiên:
-1. Biến môi trường `IKH_BRIDGE_SKILLS_DIR` (nếu có thiết lập).
-2. Thư mục `skills/` trong thư mục hiện tại hoặc root của repo.
-3. Thư mục Skill cá nhân tại `~/.ikh-skills`.
+The Bridge searches for Skills in this order:
 
-Điều này giúp **tách biệt hoàn toàn việc lưu trữ Skill khỏi repo giáo trình**. Bạn có thể đặt Skill ở bất kỳ đâu và trỏ `IKH_BRIDGE_SKILLS_DIR` tới đó.
+1. `IKH_BRIDGE_SKILLS_DIR`, if set.
+2. A `skills/` folder in the repository/current working directory.
+3. `~/.ikh-skills`.
 
-A Skill may include:
-- `SKILL.md`: instructions written for an AI/agent or human.
-- `skill.json`: machine-readable runtime contract.
-- `scripts/`: tool entrypoints explicitly declared in `skill.json`.
+Example library:
 
-See `skill-template/` for the portable Skill contract. Keep each Skill's own requirements and assets within its folder where practical.
+```text
+~/.ikh-skills/
+  iKH-Curriculum-Authoring/
+    SKILL.md
+  another-skill/
+    SKILL.md
+    skill.json       # optional: only if registering Python tools
+    scripts/         # optional: deterministic local helpers
+```
 
-## Safety model (MVP)
+Keep the Skill library independent of the curriculum repository if desired. Set `IKH_BRIDGE_SKILLS_DIR` to the parent folder containing Skill directories.
 
-- The server defaults to `127.0.0.1`; do not expose it to a LAN or public internet.
-- The runner invokes Python entrypoints directly with an argument array; it does not use `shell=True`.
-- Entrypoints must resolve inside their Skill directory.
-- A manifest is a declaration, not proof that code is safe. Review new Skills and scripts before running them.
-- Do not place API keys or credentials in Skills, manifests, logs, or the repository.
-- This MVP does not call any AI provider automatically and has no implicit cloud fallback.
-- No generic file-edit, Git-push, delete, or network tool is provided. However, a declared Python script runs with the current OS user's permissions and could still modify files or use the network. Review code first and use a disposable workspace for initial tests.
-- Treat this as a development MVP; perform local tests and security review before using it on important files.
+## Safety notes
 
-## Current limitations
-
-- No AI provider adapter is wired yet.
-- No fine-grained OS sandbox or per-path read/write enforcement yet. The UI requires an explicit acknowledgement before launching a declared script, but that is not a substitute for code review or OS isolation.
-- No background queue or cancellation yet.
-- Skills must expose explicit Python tools to be runnable.
-- The current runner launches a declared script with no additional arguments, using the chosen workspace as its working directory and `IKH_BRIDGE_WORKSPACE` as an environment variable.
-- Run output is captured in the job record; large-output management and robust process isolation are future work.
+- The web UI binds to `127.0.0.1` by default; do not expose it to a LAN/public internet.
+- A manifest is a declaration, not proof that code is safe.
+- Python tools run with the current OS user's permissions; there is no OS sandbox in this MVP.
+- No cloud fallback or AI provider is called.
+- Review scripts before running them. Do not put credentials in Skills, logs, or the repository.
 
 ## Development checks
 
 ```bash
-python -m compileall src
+python -m compileall -q src tests
 python -m unittest discover -s tests -v
 ```
+
+These commands test the current deterministic Bridge scaffold only; they do not prove end-to-end AI Skill execution.
