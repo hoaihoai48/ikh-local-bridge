@@ -1,77 +1,55 @@
-# Local Bridge MVP
+# iKH Local Bridge
 
-Local Bridge is a local-first host for reusable Skills created by the user with ChatGPT or another AI. It is **not** a separate bridge per Skill.
+**One running Local Bridge = one Skill + one local workspace.** It replaces the remote/server-side execution environment with local file and command execution. It is not a multi-Skill library manager.
 
-## MVP goals
+The Bridge loads the selected Skill's SKILL.md as the agent instructions, sends the task to a configured model, and exposes local tools so the agent can inspect and modify files and run checks in the workspace.
 
-- Discover Skill folders from a local Skill library.
-- Read a small, provider-independent `skill.json` manifest.
-- Expose a local UI and API for inspecting Skills and registered tools.
-- Execute only explicitly registered Python entrypoints, without a shell.
-- Persist job records in SQLite and record logs/results.
-- Bind the server to loopback by default.
+## Current architecture
 
-## Status
+- **One Skill:** configured by IKH_BRIDGE_SKILL_FILE, pointing directly to a single SKILL.md.
+- **One workspace:** configured by IKH_BRIDGE_WORKSPACE.
+- **Local-first model:** OpenAI-compatible local endpoint, defaulting to Ollama at http://127.0.0.1:11434/v1.
+- **Agent loop:** model can call local tools repeatedly; Bridge returns tool results to the model until it finishes or reaches a bounded round limit.
+- **Local tools:** list files, read/write text files, and run commands with argv (no shell invocation). File tools reject paths outside the workspace.
+- **No implicit cloud fallback:** if the local model is unavailable, the task fails with an error. A remote HTTPS provider can be configured explicitly.
+- **No per-Skill manifest:** SKILL.md is the required instruction file. No skill.json is needed to load it.
 
-This is the first scaffold, not a security-certified or production-ready runtime. Existing Skills that do not yet have `skill.json` can be discovered by their `SKILL.md`, but cannot be executed until their tools are explicitly declared and reviewed.
+## macOS setup
 
-## Requirements
+Requirements: Python 3.11+, Git, and a local OpenAI-compatible model server. For the default setup, install Ollama from https://ollama.com/.
 
-- Python 3.11+
-- Install dependencies in an isolated virtual environment.
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install --upgrade pip
+    pip install -e ".[dev]"
+    ollama pull qwen2.5-coder:7b
 
-From the repository root:
+Configure one Skill and one workspace before starting the Bridge:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-ikh-bridge
-```
+    export IKH_BRIDGE_SKILL_FILE="/absolute/path/to/your-skill/SKILL.md"
+    export IKH_BRIDGE_WORKSPACE="/absolute/path/to/working-directory"
+    export IKH_BRIDGE_MODEL="qwen2.5-coder:7b"
+    export IKH_BRIDGE_MODEL_BASE_URL="http://127.0.0.1:11434/v1"
+    ikh-bridge
 
-Open http://127.0.0.1:8765.
+Ensure Ollama is running, then open http://127.0.0.1:8765. The page should show the one configured Skill, workspace, model and endpoint. See docs/MACOS_SETUP.md.
 
-Chi tiết cài đặt và cấu hình riêng cho macOS: xem [Hướng dẫn cài đặt macOS](docs/MACOS_SETUP.md) và [Báo cáo kiểm chứng](docs/VERIFICATION_REPORT.md).
+## Optional remote provider
 
-## Skill library
+A remote provider is not selected automatically. To use one, explicitly set its OpenAI-compatible HTTPS base URL, model name, and API key in the environment before starting the Bridge. The Skill text, task, and tool results will be sent to that provider. Never configure a remote provider if the task or workspace content must remain local.
 
-Mặc định, Local Bridge sẽ tìm Skill theo thứ tự ưu tiên:
-1. Biến môi trường `IKH_BRIDGE_SKILLS_DIR` (nếu có thiết lập).
-2. Thư mục `skills/` trong thư mục hiện tại hoặc root của repo.
-3. Thư mục Skill cá nhân tại `~/.ikh-skills`.
+## Tests
 
-Điều này giúp **tách biệt hoàn toàn việc lưu trữ Skill khỏi repo giáo trình**. Bạn có thể đặt Skill ở bất kỳ đâu và trỏ `IKH_BRIDGE_SKILLS_DIR` tới đó.
+    python -m compileall -q src tests
+    python -m unittest discover -s tests -v
 
-A Skill may include:
-- `SKILL.md`: instructions written for an AI/agent or human.
-- `skill.json`: machine-readable runtime contract.
-- `scripts/`: tool entrypoints explicitly declared in `skill.json`.
+These tests need to be run in the target local environment. Do not claim a test passed unless its output was actually observed.
 
-See `skill-template/` for the portable Skill contract. Keep each Skill's own requirements and assets within its folder where practical.
+## Security and limitations
 
-## Safety model (MVP)
-
-- The server defaults to `127.0.0.1`; do not expose it to a LAN or public internet.
-- The runner invokes Python entrypoints directly with an argument array; it does not use `shell=True`.
-- Entrypoints must resolve inside their Skill directory.
-- A manifest is a declaration, not proof that code is safe. Review new Skills and scripts before running them.
-- Do not place API keys or credentials in Skills, manifests, logs, or the repository.
-- This MVP does not call any AI provider automatically and has no implicit cloud fallback.
-- No generic file-edit, Git-push, delete, or network tool is provided. However, a declared Python script runs with the current OS user's permissions and could still modify files or use the network. Review code first and use a disposable workspace for initial tests.
-- Treat this as a development MVP; perform local tests and security review before using it on important files.
-
-## Current limitations
-
-- No AI provider adapter is wired yet.
-- No fine-grained OS sandbox or per-path read/write enforcement yet. The UI requires an explicit acknowledgement before launching a declared script, but that is not a substitute for code review or OS isolation.
-- No background queue or cancellation yet.
-- Skills must expose explicit Python tools to be runnable.
-- The current runner launches a declared script with no additional arguments, using the chosen workspace as its working directory and `IKH_BRIDGE_WORKSPACE` as an environment variable.
-- Run output is captured in the job record; large-output management and robust process isolation are future work.
-
-## Development checks
-
-```bash
-python -m compileall src
-python -m unittest discover -s tests -v
-```
+- The Bridge binds to loopback by default. Do not expose it to a LAN or public internet.
+- File tools enforce workspace path boundaries; this is not a full OS sandbox.
+- Commands run with the current user's permissions. Review the Skill and use a dedicated workspace.
+- The model must support OpenAI-compatible chat completions with tool calling.
+- Local text/coding models do not automatically provide image generation. Image work requires a real image-capable local model/service and a corresponding adapter; this version does not pretend that capability exists.
+- Agent orchestration is an initial implementation. Test with disposable workspaces before relying on it for important projects.
