@@ -2,17 +2,19 @@
 
 **One running Local Bridge = one Skill + one local workspace.** It replaces the remote/server-side execution environment with local file and command execution. It is not a multi-Skill library manager.
 
-The Bridge loads the selected Skill's SKILL.md as the agent instructions, sends the task to a configured model, and exposes local tools so the agent can inspect and modify files and run checks in the workspace.
+The Bridge loads the selected Skill's `SKILL.md` as agent instructions, sends the task to the configured model, and exposes local tools so the agent can inspect and modify files and run checks in the workspace.
 
 ## Current architecture
 
-- **One Skill:** configured by IKH_BRIDGE_SKILL_FILE, pointing directly to a single SKILL.md.
-- **One workspace:** configured by IKH_BRIDGE_WORKSPACE.
-- **Local-first model:** OpenAI-compatible local endpoint, defaulting to Ollama at http://127.0.0.1:11434/v1.
+- **One Skill:** configured by `IKH_BRIDGE_SKILL_FILE`, pointing directly to a single `SKILL.md`.
+- **One workspace:** configured by `IKH_BRIDGE_WORKSPACE`.
+- **Per-Skill UI:** place an optional `bridge-ui.html` next to that Skill's `SKILL.md` to replace the built-in home page with an interface designed specifically for that Skill. The custom UI can call `/api/status`, `/api/jobs`, and `POST /api/task`. See `docs/SKILL_CONTRACT.md`.
+- **Built-in workbench:** if no custom UI exists, a dark responsive workbench identifies the active Skill, shows model/workspace status, accepts tasks, displays results, and lists recent jobs. This fallback is useful but is not a magically generated domain-specific interface.
+- **Local-first model:** OpenAI-compatible local endpoint, defaulting to Ollama at `http://127.0.0.1:11434/v1`.
 - **Agent loop:** model can call local tools repeatedly; Bridge returns tool results to the model until it finishes or reaches a bounded round limit.
 - **Local tools:** list files, read/write text files, and run commands with argv (no shell invocation). File tools reject paths outside the workspace.
-- **No implicit cloud fallback:** if the local model is unavailable, the task fails with an error. A remote HTTPS provider can be configured explicitly.
-- **No per-Skill manifest:** SKILL.md is the required instruction file. No skill.json is needed to load it.
+- **No implicit cloud fallback:** if the local model is unavailable, the task fails with an error. A remote HTTPS endpoint can be configured explicitly.
+- **No per-Skill manifest:** `SKILL.md` is the required instruction file. No `skill.json` is needed to load it.
 
 ## macOS setup
 
@@ -32,7 +34,7 @@ Configure one Skill and one workspace before starting the Bridge:
     export IKH_BRIDGE_MODEL_BASE_URL="http://127.0.0.1:11434/v1"
     ikh-bridge
 
-Ensure Ollama is running, then open http://127.0.0.1:8765. The page should show the one configured Skill, workspace, model and endpoint. See docs/MACOS_SETUP.md.
+Ensure Ollama is running, then open http://127.0.0.1:8765. The page identifies the one configured Skill, workspace, model and endpoint. See `docs/MACOS_SETUP.md`.
 
 ## Optional remote provider
 
