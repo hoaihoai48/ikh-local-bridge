@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .agent import AgentError, run_agent
 from .jobs import JobStore
@@ -29,6 +29,13 @@ def configured_workspace() -> Path:
 
 class TaskRequest(BaseModel):
     task: str = Field(min_length=1, max_length=20000)
+
+    @field_validator("task")
+    @classmethod
+    def task_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("task must not be blank")
+        return value.strip()
 
 
 @app.get("/health")
