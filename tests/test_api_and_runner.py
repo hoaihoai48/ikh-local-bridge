@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -41,7 +42,7 @@ class LocalToolTests(unittest.TestCase):
 
     def test_run_command_uses_workspace_and_returns_exit_code(self):
         result = execute_tool("run_command", {
-            "argv": ["python", "-c", "print('ok')"], "timeout_seconds": 10
+            "argv": [sys.executable, "-c", "print('ok')"], "timeout_seconds": 10
         }, self.root)
         self.assertTrue(result["ok"])
         self.assertEqual(result["exit_code"], 0)
