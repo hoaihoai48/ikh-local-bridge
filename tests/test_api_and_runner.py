@@ -132,6 +132,19 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         run_agent.assert_called_once_with(self.skill.resolve(), self.workspace.resolve(), "Create a file")
 
+    def test_home_uses_skill_specific_ui_when_present(self):
+        custom_ui = self.root / "bridge-ui.html"
+        custom_ui.write_text("<html><body>Dedicated Curriculum UI</body></html>", encoding="utf-8")
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Dedicated Curriculum UI", response.text)
+
+    def test_home_has_built_in_workbench_without_custom_ui(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Skill workbench", response.text)
+        self.assertIn("Chạy Skill", response.text)
+
     def test_empty_task_rejected(self):
         response = self.client.post("/api/task", json={"task": ""})
         self.assertEqual(response.status_code, 422)
