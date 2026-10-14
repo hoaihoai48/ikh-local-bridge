@@ -138,6 +138,16 @@ def _run(root,argv,cwd=".",timeout_seconds=60):
     elif exe=="git":
         if not args or args[0] not in {"status","diff","log","ls-files","show"}: raise ValueError("only read-only git status/diff/log/ls-files/show allowed")
         if any(x in {"push","commit","checkout","reset","clean","fetch","pull","apply","config","rm","add"} for x in args): raise ValueError("git write/network command blocked")
+        # Read-only subcommands can still write outside the workspace or run
+        # external helpers if dangerous options are passed (e.g. diff --output,
+        # --ext-diff, or --textconv). Keep this tool strictly observational.
+        blocked_git_options = {
+            "-o", "--output", "--ext-diff", "--external-diff", "--textconv",
+            "--git-dir", "--work-tree", "--config-env", "--exec-path",
+            "--upload-pack", "--receive-pack", "--no-index",
+        }
+        if any(arg in blocked_git_options or any(arg.startswith(option + "=") for option in ("--output", "--git-dir", "--work-tree", "--config-env", "--exec-path", "--upload-pack", "--receive-pack")) for arg in args):
+            raise ValueError("git option may write outside the workspace or execute external helpers")
         command=[argv[0],*args]
     else: raise ValueError("executable not allowlisted; use python/python3, pytest or read-only git")
     env={"PATH":os.environ.get("PATH",""),"HOME":str(Path.home()),"PYTHONIOENCODING":"utf-8","PYTHONUTF8":"1"}
