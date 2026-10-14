@@ -47,11 +47,29 @@ The workspace directory and Skill file must exist. Keep the canonical curriculum
 
 ## ChatGPT Secure MCP Tunnel
 
-Use the official OpenAI Secure MCP Tunnel documentation and the existing tunnel-client installed from an official source. Configure a tunnel profile whose MCP command points to the absolute path of this repository's `.venv/bin/ikh-bridge-mcp`. Do not reuse or overwrite the existing `ikh-curriculum` tunnel profile during initial testing; create a distinct pilot profile and tunnel ID.
+Use the official OpenAI Secure MCP Tunnel documentation and the existing `tunnel-client` installed from an official source.
 
-- Keep the active, existing connector/tunnel untouched while testing.
-- Keep `CONTROL_PLANE_API_KEY` outside Git and never send it to ChatGPT.
-- Use the ChatGPT workspace's supported custom MCP connector flow and permissions.
+### Reuse the existing tunnel
+
+If the existing `ikh-curriculum` tunnel is the intended tunnel for this Bridge, reuse its existing `tunnel_id`; do not create another tunnel or runtime key merely because the local MCP command changes. OpenAI's Secure MCP Tunnel documentation explicitly supports using the same `tunnel_id` with `tunnel-client`. Tunnel organization/workspace association and permissions still need to be correct.
+
+Before switching the active server:
+
+1. Inspect the current profile and record its non-secret settings (profile name, tunnel ID, MCP command, workspace/Skill paths, and current health/readiness). Never print or copy secret values.
+2. Validate the new `.venv/bin/ikh-bridge-mcp` command locally, including MCP `initialize`, `tools/list`, and representative `tools/call` operations, using a disposable workspace.
+3. Back up the existing profile securely, excluding secrets from reports and source control.
+4. Plan a short cutover window. With stdio MCP bindings, OpenAI's `tunnel-client` supports only one active `tunnel-client` process per tunnel ID. Do not run old and new stdio clients concurrently on the same tunnel ID.
+5. Stop the existing tunnel-client process, change only its MCP command/profile target to the new Bridge, and start it again using the same tunnel ID and existing runtime key.
+6. Run `tunnel-client doctor --profile <existing-profile> --explain`, verify readiness/active polling, then test the existing ChatGPT connector. If tool discovery or calls fail, stop the new process and restore the saved profile/command before restarting the old server.
+7. Do not declare cutover successful until a real ChatGPT conversation calls `get_bridge_status`, `list_files`, a disposable `write_file`/ `read_file` pair, and a reviewed harmless validator successfully.
+
+This is a controlled replacement, not a parallel pilot. The active connector may be temporarily unavailable during the switch. If zero downtime is mandatory, a separate tunnel ID and connector would be required; that is not the preferred path for this user's current goal.
+
+### Secret and permission requirements
+
+- Keep `CONTROL_PLANE_API_KEY` outside Git and never send it to ChatGPT or include it in reports.
+- Do not create a new runtime key unless the existing one is invalid or lacks required `Tunnels Read + Use` permissions.
+- Use the ChatGPT workspace's supported custom MCP connector flow and permissions. Platform tunnel permissions and ChatGPT workspace permissions are separate.
 - A successful `tunnel-client doctor` is only a transport preflight, not proof that a real ChatGPT tool call succeeds.
 
 ## Required smoke test
