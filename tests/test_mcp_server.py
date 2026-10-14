@@ -79,7 +79,7 @@ class LocalMCPServerTests(unittest.TestCase):
                 "IKH_BRIDGE_WORKSPACE": tmp,
                 "IKH_BRIDGE_SKILL_FILE": str(Path(tmp) / "missing.md"),
             }):
-                with self.assertRaisesRegex(FileNotFoundError, "Skill was not found"):
+                with self.assertRaisesRegex(ValueError, "Skill was not found"):
                     mcp_server.get_curriculum_skill()
 
 
