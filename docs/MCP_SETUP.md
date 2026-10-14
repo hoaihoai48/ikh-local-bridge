@@ -12,6 +12,23 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
+## Configure instances for one connector
+
+Copy [examples/instances.example.json](../examples/instances.example.json) to a private local path (not into a public repository), replace every placeholder with an existing absolute path, and set `enabled: true` only for instances you have reviewed. Keep one distinct workspace per course/project. The registry fails closed for unknown/disabled IDs and requires the configured workspace and Skill file to exist.
+
+Set the config before starting the MCP server:
+
+```bash
+export IKH_BRIDGE_INSTANCES_CONFIG="$HOME/.config/ikh-local-bridge/instances.json"
+.venv/bin/ikh-bridge-mcp
+```
+
+Call `list_bridge_instances` first, then pass the selected `instance_id` to `get_bridge_status`, `get_curriculum_skill`, and each workspace tool. The registry is application-level authorization only; scripts run with the current OS user's permissions.
+
+### Legacy single-instance profile
+
+For a one-workspace setup without a registry, use the environment variables below.
+
 ## Configure one isolated profile
 
 A profile is a separate process configuration, not a security sandbox. Give each profile an explicit workspace, canonical Skill path, Skill library, and SQLite job database. Do not point a profile at your whole home directory.
@@ -52,4 +69,4 @@ Record the exact OS, Python version, commands, tunnel profile name (not its secr
 
 ## Current limitation
 
-The standalone Bridge currently configures a workspace per process via environment variables. Separate processes and databases provide operational separation, but do not constitute enforced per-instance OS isolation. Do not claim a single connector can safely multiplex arbitrary workspaces until a registry, authorization model, and cross-instance isolation tests are implemented.
+The standalone Bridge supports an explicit instance registry and rejects unknown/disabled instance IDs. This is an application-level boundary, not an OS sandbox: malicious Python scripts may still access files permitted to the current user. Keep each workspace least-privilege and never treat the registry as OS-enforced isolation.
