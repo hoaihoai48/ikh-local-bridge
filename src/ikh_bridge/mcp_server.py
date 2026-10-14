@@ -1,149 +1,148 @@
-"""Local MCP server for the packaged iKH Curriculum Authoring Skill.
+"""Local stdio MCP server for explicitly registered Bridge instances.
 
-No model inference or AI-provider API calls happen in this process. A compatible
-local client (for example, ChatGPT Desktop with a local plugin) supplies the
-reasoning model; this server exposes the Skill and executes workspace tools.
+The connected client supplies reasoning; this process does not call an AI provider.
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from .instances import BridgeInstance, get_instance
 from .jobs import JobStore
 from .local_tools import execute_tool
 
-mcp = FastMCP("ikh-curriculum-local-bridge")
+mcp = FastMCP("ikh-local-bridge")
 _store = JobStore()
 
 
-def _repository_root() -> Path:
-    # src/ikh_bridge/mcp_server.py -> standalone repository root
-    return Path(__file__).resolve().parents[2]
+def _instance(instance_id: str = "default") -> BridgeInstance:
+    """Resolve only an explicitly registered, enabled workspace instance."""
+    return get_instance(instance_id)
 
 
-def _workspace() -> Path:
-    raw = os.environ.get("IKH_BRIDGE_WORKSPACE", "").strip()
-    root = Path(raw).expanduser().resolve() if raw else _repository_root()
-    if not root.is_dir():
-        raise ValueError(f"Configured workspace is not a directory: {root}")
-    return root
-
-
-def _skill_file() -> Path:
-    raw = os.environ.get("IKH_BRIDGE_SKILL_FILE", "").strip()
-    if raw:
-        path = Path(raw).expanduser().resolve()
-    else:
-        candidates = (
-            _repository_root() / "skills" / "ikh-curriculum-authoring" / "SKILL.md",
-            Path.home() / ".ikh-skills" / "ikh-curriculum-authoring" / "SKILL.md",
-        )
-        path = next((candidate.resolve() for candidate in candidates if candidate.is_file()), candidates[0].resolve())
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"iKH Curriculum Authoring Skill was not found: {path}. "
-            "Set IKH_BRIDGE_SKILL_FILE to the canonical SKILL.md, or install it under ~/.ikh-skills/ikh-curriculum-authoring/SKILL.md."
-        )
-    return path
-
-
-def _logged_execute(tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
-    ws = _workspace()
-    job_id = _store.create("ikh-curriculum-authoring", tool_name, str(ws))
+def _logged_execute(tool_name: str, args: dict[str, Any], instance_id: str = "default") -> dict[str, Any]:
+    instance = _instance(instance_id)
+    job_id = _store.create("instance:" + instance.id, tool_name, str(instance.workspace))
     try:
-        res = execute_tool(tool_name, args, ws)
-        status = "COMPLETED" if res.get("ok") else "FAILED"
-        out_summary = f"bytes: {res.get('bytes')}" if "bytes" in res else f"entries: {len(res.get('entries', []))}" if "entries" in res else ""
-        err = res.get("error") or res.get("stderr") or ""
-        _store.finish(job_id, status, 0 if status == "COMPLETED" else 1, stdout=out_summary, stderr=err)
-        return res
+        result = execute_tool(tool_name, args, instance.workspace)
+        status = "COMPLETED" if result.get("ok") else "FAILED"
+        if "bytes" in result:
+            summary = "bytes: " + str(result.get("bytes"))
+        elif "entries" in result:
+            summary = "entries: " + str(len(result.get("entries", [])))
+        elif "returncode" in result:
+            summary = "returncode: " + str(result.get("returncode"))
+        else:
+            summary = ""
+        error = result.get("error") or result.get("stderr") or ""
+        exit_code = result.get("returncode", 0 if result.get("ok") else 1)
+        _store.finish(job_id, status, exit_code, stdout=summary, stderr=error)
+        return result
     except Exception as exc:
         _store.finish(job_id, "FAILED", 1, error=str(exc))
         raise
 
 
 @mcp.tool()
-def get_bridge_status() -> dict[str, Any]:
-    """Check local workspace and canonical Skill availability. Call this first."""
-    workspace = _workspace()
-    skill = _skill_file()
-    job_id = _store.create("ikh-curriculum-authoring", "get_bridge_status", str(workspace))
-    _store.finish(job_id, "COMPLETED", 0, stdout="Checked bridge and workspace readiness")
+def list_bridge_instances() -> dict[str, Any]:
+    """List only configured instances; disabled instances are shown but cannot be selected."""
+    from .instances import load_instances
+
+    instances = load_instances()
     return {
-        "ok": True,
-        "bridge": "ikh-curriculum-local-bridge",
-        "mode": "local_mcp_tools_no_model_api",
-        "workspace": str(workspace),
-        "workspace_exists": workspace.is_dir(),
-        "skill_file": str(skill),
-        "skill_exists": skill.is_file(),
-        "skill_bytes": skill.stat().st_size,
-        "note": (
-            "Tools execute locally. The connected MCP client supplies AI reasoning. "
-            "This server does not call an AI-provider API."
-        ),
+        "instances": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "enabled": item.enabled,
+                "workspace": str(item.workspace),
+                "skill_file": str(item.skill_file),
+            }
+            for item in instances.values()
+        ]
     }
 
 
 @mcp.tool()
-def get_curriculum_skill() -> dict[str, Any]:
-    """Load the canonical iKH Skill. MUST be called before curriculum work."""
-    path = _skill_file()
-    content = path.read_text(encoding="utf-8")
-    job_id = _store.create("ikh-curriculum-authoring", "get_curriculum_skill", str(_workspace()))
-    _store.finish(job_id, "COMPLETED", 0, stdout=f"Loaded Skill {len(content)} bytes")
+def get_bridge_status(instance_id: str = "default") -> dict[str, Any]:
+    """Check one explicitly configured Bridge instance and its canonical Skill."""
+    instance = _instance(instance_id)
+    job_id = _store.create("instance:" + instance.id, "get_bridge_status", str(instance.workspace))
+    _store.finish(job_id, "COMPLETED", 0, stdout="Checked bridge instance readiness")
     return {
         "ok": True,
-        "path": str(path),
+        "bridge": "ikh-local-bridge",
+        "mode": "local_mcp_tools_no_model_api",
+        "instance_id": instance.id,
+        "instance_name": instance.name,
+        "workspace": str(instance.workspace),
+        "workspace_exists": instance.workspace.is_dir(),
+        "skill_file": str(instance.skill_file),
+        "skill_exists": instance.skill_file.is_file(),
+        "skill_bytes": instance.skill_file.stat().st_size,
+        "note": "Tools use application-level workspace path checks, not an OS sandbox. This process does not call an AI-provider API.",
+    }
+
+
+@mcp.tool()
+def get_curriculum_skill(instance_id: str = "default") -> dict[str, Any]:
+    """Load the canonical Skill configured for the selected Bridge instance."""
+    instance = _instance(instance_id)
+    content = instance.skill_file.read_text(encoding="utf-8")
+    job_id = _store.create("instance:" + instance.id, "get_curriculum_skill", str(instance.workspace))
+    _store.finish(job_id, "COMPLETED", 0, stdout="Loaded Skill " + str(len(content)) + " bytes")
+    return {
+        "ok": True,
+        "instance_id": instance.id,
+        "path": str(instance.skill_file),
         "name": "iKH Curriculum Authoring Skill",
         "content": content,
-        "instruction": (
-            "Treat this file as the normative workflow. Inspect the target course's "
-            "own canonical files and validators before editing. Honor evidence, plan, "
-            "content-lock and QA gates. Report PASS, FAIL, BLOCKED and NOT VERIFIED "
-            "separately; never claim a check passed unless a local tool ran it."
-        ),
+        "instruction": "Treat this file as the normative workflow. Inspect canonical files and validators before editing. Preserve evidence and QA gates. Report PASS, FAIL, BLOCKED, and NOT VERIFIED separately.",
     }
 
 
 @mcp.tool()
-def list_files(path: str = ".") -> dict[str, Any]:
-    """List files and directories inside the configured local curriculum workspace."""
-    return _logged_execute("list_files", {"path": path})
+def list_files(path: str = ".", instance_id: str = "default") -> dict[str, Any]:
+    """List direct children of a directory inside the selected instance workspace."""
+    return _logged_execute("list_files", {"path": path}, instance_id)
 
 
 @mcp.tool()
-def read_file(path: str) -> dict[str, Any]:
-    """Read a UTF-8 text file inside the local workspace; protected paths are blocked."""
-    return _logged_execute("read_file", {"path": path})
+def read_file(path: str, instance_id: str = "default") -> dict[str, Any]:
+    """Read a UTF-8 text file inside the selected instance workspace."""
+    return _logged_execute("read_file", {"path": path}, instance_id)
 
 
 @mcp.tool()
-def write_file(path: str, content: str) -> dict[str, Any]:
-    """Create or update a UTF-8 text file when the user's task authorizes changes."""
-    return _logged_execute("write_file", {"path": path, "content": content})
+def write_file(path: str, content: str, instance_id: str = "default") -> dict[str, Any]:
+    """Create or update a UTF-8 text file inside the selected instance workspace."""
+    return _logged_execute("write_file", {"path": path, "content": content}, instance_id)
 
 
 @mcp.tool()
-def run_command(argv: list[str], cwd: str = ".", timeout_seconds: int = 60) -> dict[str, Any]:
-    """Run an allowlisted Python test/validator or read-only Git command; no shell/install/commit/push."""
+def run_command(
+    argv: list[str],
+    cwd: str = ".",
+    timeout_seconds: int = 60,
+    instance_id: str = "default",
+) -> dict[str, Any]:
+    """Run an allowlisted Python test/validator or read-only Git command in the selected instance."""
     return _logged_execute(
         "run_command",
         {"argv": argv, "cwd": cwd, "timeout_seconds": timeout_seconds},
+        instance_id,
     )
 
 
 @mcp.tool()
-def fetch_url(url: str) -> dict[str, Any]:
-    """Fetch a public HTTPS source page using GET only; local/private IP targets are blocked."""
-    return _logged_execute("fetch_url", {"url": url})
+def fetch_url(url: str, instance_id: str = "default") -> dict[str, Any]:
+    """Fetch a public HTTPS source page; private/local IPs and unsafe redirects are blocked."""
+    return _logged_execute("fetch_url", {"url": url}, instance_id)
 
 
 def main() -> None:
-    # MCP stdio is local process communication; do not expose a network listener.
+    # MCP stdio is local process communication; no network listener is opened.
     mcp.run(transport="stdio")
 
 
