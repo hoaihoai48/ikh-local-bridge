@@ -12,13 +12,13 @@ One Local Bridge runtime hosts many independently authored Skills. A Skill can b
 - **Tool runner:** executes only declared Python entrypoints, without a shell, with a timeout and captured output.
 - **Job store:** records status, timestamps, exit code, stdout/stderr, and errors in SQLite.
 - **Local UI/API:** provides Skill discovery, job history, and an explicit-confirmation action for declared tools.
-- **MCP adapter:** optional stdio MCP server exposing a fixed set of workspace tools to a connected reasoning client; it does not generate content or call a model API.\n- **Provider adapters (future):** explicit provider selection and common interface; no implicit fallback to a cloud provider.
+- **Instance registry:** explicit allowlist of named, enabled workspace/Skill pairs; unknown and disabled IDs fail closed.\n- **MCP adapter:** optional stdio MCP server exposing a fixed set of workspace tools through the instance registry to a connected reasoning client; it does not generate content or call a model API. The registry is application-level authorization, not an OS sandbox.\n- **Provider adapters (future):** explicit provider selection and common interface; no implicit fallback to a cloud provider.
 
 ## Runtime lifecycle target
 
 DISCOVER -> VALIDATE MANIFEST -> REVIEW PERMISSIONS -> PLAN -> WAIT FOR APPROVAL IF NEEDED -> RUN REGISTERED TOOLS -> VALIDATE OUTPUT -> RECORD EVIDENCE -> REPORT.
 
-The runtime implements discovery, manifest validation, SQLite history, launching declared Python entrypoints after a UI/API acknowledgement, and a separate stdio MCP interface for a configured workspace. It does not implement OS-level isolation or safe multiplexing of multiple workspaces through one connector.
+The runtime implements discovery, manifest validation, SQLite history, launching declared Python entrypoints after a UI/API acknowledgement, and a separate stdio MCP interface for a configured workspace. It does not implement OS-level isolation. Multi-workspace selection is available through an explicit application-level registry, but must not be described as a filesystem sandbox.
 
 ## Workspace and execution boundaries
 
