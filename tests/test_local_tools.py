@@ -42,6 +42,7 @@ class LocalToolsTests(unittest.TestCase):
     def test_git_read_only_commands_reject_write_and_external_helper_options(self):
         for argv in (
             ["git", "diff", "--output=../outside.txt"],
+            ["git", "diff", "-o../outside.txt"],
             ["git", "diff", "--ext-diff"],
             ["git", "show", "--textconv"],
             ["git", "status", "--work-tree=../outside"],
