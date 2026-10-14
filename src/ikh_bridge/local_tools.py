@@ -146,7 +146,7 @@ def _run(root,argv,cwd=".",timeout_seconds=60):
             "--git-dir", "--work-tree", "--config-env", "--exec-path",
             "--upload-pack", "--receive-pack", "--no-index",
         }
-        if any(arg in blocked_git_options or any(arg.startswith(option + "=") for option in ("--output", "--git-dir", "--work-tree", "--config-env", "--exec-path", "--upload-pack", "--receive-pack")) for arg in args):
+        if any(arg in blocked_git_options or arg.startswith("-o") or any(arg.startswith(option + "=") for option in ("--output", "--git-dir", "--work-tree", "--config-env", "--exec-path", "--upload-pack", "--receive-pack")) for arg in args):
             raise ValueError("git option may write outside the workspace or execute external helpers")
         command=[argv[0],*args]
     else: raise ValueError("executable not allowlisted; use python/python3, pytest or read-only git")
