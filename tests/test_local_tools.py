@@ -39,6 +39,41 @@ class LocalToolsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "command name without a path"):
                     execute_tool("run_command", {"argv": [executable, "--version"]}, self.root)
 
+    def test_git_read_only_commands_reject_write_and_external_helper_options(self):
+        for argv in (
+            ["git", "diff", "--output=../outside.txt"],
+            ["git", "diff", "--ext-diff"],
+            ["git", "show", "--textconv"],
+            ["git", "status", "--work-tree=../outside"],
+        ):
+            with self.subTest(argv=argv):
+                with self.assertRaisesRegex(ValueError, "git option may write outside"):
+                    execute_tool("run_command", {"argv": argv}, self.root)
+
+    def test_symlink_to_outside_workspace_is_blocked_for_read_and_write(self):
+        outside = self.root.parent / (self.root.name + "-outside.txt")
+        outside.write_text("do not touch", encoding="utf-8")
+        link = self.root / "outside-link.txt"
+        try:
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            outside.unlink(missing_ok=True)
+            self.skipTest("symlinks are not available in this environment")
+        try:
+            with self.assertRaises(ValueError):
+                execute_tool("read_file", {"path": "outside-link.txt"}, self.root)
+            with self.assertRaises(ValueError):
+                execute_tool("write_file", {"path": "outside-link.txt", "content": "modified"}, self.root)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "do not touch")
+        finally:
+            outside.unlink(missing_ok=True)
+
+    def test_write_blocks_protected_runtime_paths(self):
+        for path in (".git/should-not-exist", ".config/secret", ".env.local"):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    execute_tool("write_file", {"path": path, "content": "no"}, self.root)
+
     def test_write_blocks_path_traversal_and_oversized_content(self):
         with self.assertRaises(ValueError):
             execute_tool("write_file", {"path": "../outside.txt", "content": "no"}, self.root)
