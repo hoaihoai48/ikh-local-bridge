@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "instances": [
+    {
+      "id": "python-level-2",
+      "name": "Python Bang A Level 2 pilot",
+      "workspace": "/ABSOLUTE/PATH/TO/python-level-2-workspace",
+      "skill_file": "/ABSOLUTE/PATH/TO/ikh-skills/ikh-curriculum-authoring/SKILL.md",
+      "enabled": false
+    },
+    {
+      "id": "office-curriculum",
+      "name": "Office curriculum",
+      "workspace": "/ABSOLUTE/PATH/TO/office-workspace",
+      "skill_file": "/ABSOLUTE/PATH/TO/office-skill/SKILL.md",
+      "enabled": false
+    }
+  ]
+}
