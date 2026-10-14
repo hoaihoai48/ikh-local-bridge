@@ -5,14 +5,14 @@
 Repository: `hoaihoai48/ikh-local-bridge`  
 Branch: `feat/standalone-mcp-instance-architecture`  
 PR: [#3 — Add standalone MCP adapter and migration gates](https://github.com/hoaihoai48/ikh-local-bridge/pull/3)  
-Latest implementation commit at report time: `0b3b8a9f0eba0aa343f4a2a14f91d703efc7c6c7`
+Latest implementation commit at report update: `4d4a9ef62c27047971654accbbebac9685055be2`
 
 This report records code and repository changes made through GitHub APIs. It does **not** claim that code was run on the user's Mac or that a live ChatGPT + Secure MCP Tunnel test passed.
 
 ## Changes made
 
 - Fixed literal `\\n` sequences in `README.md` and `docs/ARCHITECTURE.md`, restoring normal Markdown line breaks.
-- Hardened the allowlisted Git command path in `src/ikh_bridge/local_tools.py` by rejecting options that can write output outside the workspace or invoke external helpers, including `--output`, `--ext-diff`, `--textconv`, alternate git/work-tree paths, and related options.
+- Hardened the allowlisted Git command path in `src/ikh_bridge/local_tools.py` by rejecting options that can write output outside the workspace or invoke external helpers, including `--output` (including combined `-oPATH`), `--ext-diff`, `--textconv`, alternate git/work-tree paths, and related options.
 - Added tests in `tests/test_local_tools.py` for risky Git options, symlink-based read/write escapes, and writes to protected runtime/configuration paths.
 - Preserved the existing tunnel/connector and did not merge the PR or change the default branch.
 
