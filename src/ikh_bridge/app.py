@@ -11,7 +11,7 @@ from .jobs import JobStore
 from .registry import default_library, discover_skills
 from .runner import RunRejected, run_tool
 
-app = FastAPI(title="iKH Local Bridge", version="0.1.0")
+app = FastAPI(title="iKH Local Bridge", version="0.2.0")
 store = JobStore()
 
 
@@ -24,7 +24,7 @@ class RunRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "app": "ikh-local-bridge", "version": "0.1.0"}
+    return {"status": "ok", "app": "ikh-local-bridge", "version": "0.2.0"}
 
 
 @app.get("/api/skills")

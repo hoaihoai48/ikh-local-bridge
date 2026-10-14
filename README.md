@@ -1,4 +1,4 @@
-# Local Bridge MVP
+# iKH Local Bridge
 
 Local Bridge is a local-first host for reusable Skills created by the user with ChatGPT or another AI. It is **not** a separate bridge per Skill.
 
@@ -13,7 +13,7 @@ Local Bridge is a local-first host for reusable Skills created by the user with 
 
 ## Status
 
-This is the first scaffold, not a security-certified or production-ready runtime. Existing Skills that do not yet have `skill.json` can be discovered by their `SKILL.md`, but cannot be executed until their tools are explicitly declared and reviewed.
+This is a development runtime, not a security-certified or production-ready sandbox. Existing Skills that do not yet have `skill.json` can be discovered by their `SKILL.md`, but cannot be executed until their tools are explicitly declared and reviewed.
 
 ## Requirements
 
@@ -62,12 +62,18 @@ See `skill-template/` for the portable Skill contract. Keep each Skill's own req
 
 ## Current limitations
 
-- No AI provider adapter is wired yet.
+- No AI provider adapter or model-generation API is wired in. A standalone stdio MCP server is available as `ikh-bridge-mcp` for a connected reasoning client.
 - No fine-grained OS sandbox or per-path read/write enforcement yet. The UI requires an explicit acknowledgement before launching a declared script, but that is not a substitute for code review or OS isolation.
 - No background queue or cancellation yet.
-- Skills must expose explicit Python tools to be runnable.
+- Skills must expose explicit Python tools to be runnable through the web runner. The MCP interface separately exposes a fixed set of workspace tools.
 - The current runner launches a declared script with no additional arguments, using the chosen workspace as its working directory and `IKH_BRIDGE_WORKSPACE` as an environment variable.
 - Run output is captured in the job record; large-output management and robust process isolation are future work.
+
+## MCP interface
+
+Install with `pip install -e ".[dev]"`, set `IKH_BRIDGE_WORKSPACE` to a dedicated workspace and `IKH_BRIDGE_SKILL_FILE` to the canonical Skill file, then run `ikh-bridge-mcp`. It communicates over stdio and does not open a network listener. See [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for a separate pilot profile and ChatGPT Secure MCP Tunnel acceptance test. Keep the existing tunnel profile untouched until a real ChatGPT tool call succeeds.
+
+The MCP server supports an explicit `IKH_BRIDGE_INSTANCES_CONFIG` registry so one connector can select among named, enabled workspaces using `instance_id`. Unknown and disabled IDs are rejected. Workspace path checks and command allowlists are application-level controls, not an OS sandbox; scripts still run with the current user's OS permissions. See `examples/instances.example.json` and `docs/MCP_SETUP.md`.
 
 ## Development checks
 
