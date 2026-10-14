@@ -113,8 +113,8 @@ Only after all gates pass should the owner choose whether to switch the active c
 | Gate | Required evidence | Current status |
 |---|---|---|
 | Standalone runtime baseline | Existing unit/integration tests run locally from a clean checkout | Reported in existing verification doc; not rerun in this session |
-| Instance isolation | Cross-instance path and tool access tests | NOT IMPLEMENTED / NOT VERIFIED |
-| Per-path read/write enforcement | Adversarial filesystem tests against an enforced boundary | NOT IMPLEMENTED / NOT VERIFIED |
+| Instance selection/authorization | Explicit registry; unknown/disabled IDs rejected; cross-instance routing tests | IMPLEMENTED IN PR; CI pending latest commit |
+| Per-path read/write enforcement | Adversarial filesystem tests against an enforced boundary | APPLICATION-LEVEL ONLY; NOT OS SANDBOXED |
 | MCP protocol compatibility | MCP initialize/list-tools/call contract tests | NOT VERIFIED for this standalone repository |
 | ChatGPT end-to-end | A real tool call from normal ChatGPT Chat using the new connector | NOT VERIFIED |
 | Tunnel lifecycle | Startup/health/shutdown/recovery tests on macOS | NOT VERIFIED in this session |
