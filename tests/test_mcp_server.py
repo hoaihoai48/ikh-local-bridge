@@ -83,5 +83,38 @@ class LocalMCPServerTests(unittest.TestCase):
                     mcp_server.get_curriculum_skill()
 
 
+    def test_tools_select_only_registered_instance(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace_a = root / "workspace-a"
+            workspace_b = root / "workspace-b"
+            workspace_a.mkdir()
+            workspace_b.mkdir()
+            skill_a = root / "skill-a.md"
+            skill_b = root / "skill-b.md"
+            skill_a.write_text("# Skill A", encoding="utf-8")
+            skill_b.write_text("# Skill B", encoding="utf-8")
+            config = root / "instances.json"
+            config.write_text(json.dumps({
+                "schema_version": 1,
+                "instances": [
+                    {"id": "python-a", "name": "Python A", "workspace": str(workspace_a),
+                     "skill_file": str(skill_a), "enabled": True},
+                    {"id": "python-b", "name": "Python B", "workspace": str(workspace_b),
+                     "skill_file": str(skill_b), "enabled": True}
+                ]
+            }), encoding="utf-8")
+            with patch.dict(os.environ, {"IKH_BRIDGE_INSTANCES_CONFIG": str(config)}):
+                status_a = mcp_server.get_bridge_status("python-a")
+                status_b = mcp_server.get_bridge_status("python-b")
+                written = mcp_server.write_file("only-a.md", "A", "python-a")
+                with self.assertRaisesRegex(ValueError, "Unknown Bridge instance"):
+                    mcp_server.read_file("only-a.md", "not-registered")
+            self.assertEqual(status_a["workspace"], str(workspace_a.resolve()))
+            self.assertEqual(status_b["workspace"], str(workspace_b.resolve()))
+            self.assertTrue((workspace_a / "only-a.md").is_file())
+            self.assertFalse((workspace_b / "only-a.md").exists())
+
 if __name__ == "__main__":
     unittest.main()
