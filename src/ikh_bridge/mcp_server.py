@@ -20,8 +20,8 @@ _store = JobStore()
 
 
 def _repository_root() -> Path:
-    # local-bridge/src/ikh_bridge/mcp_server.py -> repository root
-    return Path(__file__).resolve().parents[3]
+    # src/ikh_bridge/mcp_server.py -> standalone repository root
+    return Path(__file__).resolve().parents[2]
 
 
 def _workspace() -> Path:
@@ -34,13 +34,18 @@ def _workspace() -> Path:
 
 def _skill_file() -> Path:
     raw = os.environ.get("IKH_BRIDGE_SKILL_FILE", "").strip()
-    path = Path(raw).expanduser().resolve() if raw else (
-        _repository_root() / "skills" / "ikh-curriculum-authoring" / "SKILL.md"
-    )
+    if raw:
+        path = Path(raw).expanduser().resolve()
+    else:
+        candidates = (
+            _repository_root() / "skills" / "ikh-curriculum-authoring" / "SKILL.md",
+            Path.home() / ".ikh-skills" / "ikh-curriculum-authoring" / "SKILL.md",
+        )
+        path = next((candidate.resolve() for candidate in candidates if candidate.is_file()), candidates[0].resolve())
     if not path.is_file():
         raise FileNotFoundError(
             f"iKH Curriculum Authoring Skill was not found: {path}. "
-            "Set IKH_BRIDGE_SKILL_FILE to the canonical SKILL.md."
+            "Set IKH_BRIDGE_SKILL_FILE to the canonical SKILL.md, or install it under ~/.ikh-skills/ikh-curriculum-authoring/SKILL.md."
         )
     return path
 
