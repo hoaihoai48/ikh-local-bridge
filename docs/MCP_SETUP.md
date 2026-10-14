@@ -65,6 +65,23 @@ Before switching the active server:
 
 This is a controlled replacement, not a parallel pilot. The active connector may be temporarily unavailable during the switch. If zero downtime is mandatory, a separate tunnel ID and connector would be required; that is not the preferred path for this user's current goal.
 
+### Exact command for the existing curriculum workspace
+
+The standalone server's legacy single-instance mode supports explicit workspace and Skill environment variables. The tunnel-client YAML `mcp.commands[].command` field is parsed as an executable plus arguments, not a shell script; use `/usr/bin/env` to set non-secret child-process variables without changing the parent tunnel-client environment.
+
+After local MCP protocol tests pass, the replacement `mcp.commands` entry should be equivalent to:
+
+```yaml
+mcp:
+  commands:
+    - channel: main
+      command: "/usr/bin/env IKH_BRIDGE_WORKSPACE=/Users/vu/Developer/giao-trinh-ikh IKH_BRIDGE_SKILL_FILE=/Users/vu/Developer/giao-trinh-ikh/skills/ikh-curriculum-authoring/SKILL.md /Users/vu/Developer/ikh-local-bridge/.venv/bin/ikh-bridge-mcp"
+```
+
+Do not add an `env:` property under `mcp.commands`; that is not part of the documented tunnel-client command schema. The explicit variables above are paths, not secrets. Keep the existing `control_plane.tunnel_id` and `control_plane.api_key: env:CONTROL_PLANE_API_KEY` unchanged.
+
+Before cutover, run the exact MCP command independently from a disposable terminal session and complete a real JSON-RPC `initialize`, `notifications/initialized`, `tools/list`, and representative `tools/call`. Confirm `get_bridge_status` returns the workspace and Skill paths above. Then run `tunnel-client doctor --profile ikh-curriculum --explain`. Only proceed if both checks pass.
+
 ### Secret and permission requirements
 
 - Keep `CONTROL_PLANE_API_KEY` outside Git and never send it to ChatGPT or include it in reports.
