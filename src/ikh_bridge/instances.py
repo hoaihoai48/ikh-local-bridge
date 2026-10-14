@@ -102,7 +102,7 @@ def load_instances(config_path: Path | None = None) -> dict[str, BridgeInstance]
         skill_file = next((p.resolve() for p in candidates if p.is_file()), candidates[0].resolve())
     if not skill_file.is_file():
         raise InstanceConfigError(
-            f"Skill file not found: {skill_file}; set IKH_BRIDGE_SKILL_FILE or configure an instance registry"
+            f"Skill was not found: {skill_file}; set IKH_BRIDGE_SKILL_FILE or configure an instance registry"
         )
     return {"default": BridgeInstance("default", "Default", workspace, skill_file, True)}
 
